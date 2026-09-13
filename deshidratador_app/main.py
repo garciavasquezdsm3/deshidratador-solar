@@ -19,7 +19,7 @@ from ble_client import BLEManager
 # Pide permisos de Bluetooth/ubicación en Android en tiempo de ejecución.
 # En escritorio (para pruebas) simplemente no hace nada.
 try:
-    from android.permissions import request_permissions, Permission
+    from android.permissions import request_permissions, Permission  # type: ignore
     request_permissions([
         Permission.BLUETOOTH_SCAN,
         Permission.BLUETOOTH_CONNECT,
