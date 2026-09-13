@@ -1,6 +1,7 @@
 import asyncio
 import threading
 
+# Intentamos importar bleak de forma segura
 try:
     from bleak import BleakClient, BleakScanner
     BLEAK_AVAILABLE = True
@@ -8,9 +9,9 @@ except ImportError:
     BLEAK_AVAILABLE = False
 
 class BLEManager:
-    def __init__(self, on_data=None, on_status=None):
-        self.on_data = on_data
-        self.on_status = on_status
+    def __init__(self, service_uuid=None, char_uuid=None):
+        self.service_uuid = service_uuid
+        self.char_uuid = char_uuid
         self.client = None
         self.connected = False
         self.loop = None
@@ -21,10 +22,11 @@ class BLEManager:
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
 
-    def connect(self, device_address=None):
+    def connect(self, device_address=None, callback=None):
         if not BLEAK_AVAILABLE:
-            if self.on_status:
-                self.on_status("Bleak no disponible en este sistema")
+            print("[BLE] Advertencia: Bleak no está instalado o no es compatible en esta plataforma.")
+            if callback:
+                callback(False)
             return
 
         if self.thread is None or not self.thread.is_alive():
@@ -32,10 +34,11 @@ class BLEManager:
             self.thread.start()
 
         if self.loop:
-            asyncio.run_coroutine_threadsafe(self._async_connect(device_address), self.loop)
+            asyncio.run_coroutine_threadsafe(self._async_connect(device_address, callback), self.loop)
 
-    async def _async_connect(self, device_address):
+    async def _async_connect(self, device_address, callback):
         try:
+            # Si no se pasa dirección, busca dispositivos de forma segura
             if not device_address:
                 devices = await BleakScanner.discover()
                 for d in devices:
@@ -47,19 +50,18 @@ class BLEManager:
                 self.client = BleakClient(device_address)
                 await self.client.connect()
                 self.connected = self.client.is_connected
-                if self.on_status:
-                    self.on_status("Conectado" if self.connected else "Error al conectar")
             else:
-                if self.on_status:
-                    self.on_status("Dispositivo no encontrado")
+                self.connected = False
+
+            if callback:
+                callback(self.connected)
         except Exception as e:
+            print(f"[BLE Error] Falló la conexión: {e}")
             self.connected = False
-            if self.on_status:
-                self.on_status(f"Error BLE: {e}")
+            if callback:
+                callback(False)
 
     def disconnect(self):
         if self.client and self.loop and self.connected:
             asyncio.run_coroutine_threadsafe(self.client.disconnect(), self.loop)
             self.connected = False
-            if self.on_status:
-                self.on_status("Desconectado")
